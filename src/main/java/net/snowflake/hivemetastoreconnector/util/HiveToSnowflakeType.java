@@ -74,7 +74,8 @@ public class HiveToSnowflakeType
     AVRO,
     ORC,
     PARQUET,
-    XML
+    XML,
+    DELTA
   }
 
   /**
@@ -287,6 +288,13 @@ public class HiveToSnowflakeType
       log.info("TextInputFormat detected and unknown SerDe- using CSV as the " +
                "file format type.");
       return SnowflakeFileFormatType.CSV;
+    }
+
+    // For textfiles types with SerDe's like LazySimpleSerDe, fall back to CSV
+    if (hiveFileFormat.equals("org.apache.hadoop.mapred.SequenceFileInputFormat"))
+    {
+      log.error("just hard coding the file format as Parquet ");
+      return SnowflakeFileFormatType.PARQUET;
     }
 
     throw new UnsupportedOperationException(

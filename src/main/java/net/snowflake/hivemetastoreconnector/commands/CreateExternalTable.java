@@ -235,6 +235,10 @@ public class CreateExternalTable extends Command
         HiveToSnowflakeType.toSnowflakeFileFormatType(
           hiveTable.getSd().getSerdeInfo().getSerializationLib(),
           hiveTable.getSd().getInputFormat());
+    
+    log.info("Debug logging jayt  " +
+    " getSerializationLib(): " + hiveTable.getSd().getSerdeInfo().getSerializationLib() +
+    " getInputFormat(): " + hiveTable.getSd().getInputFormat());
 
     if (!cols.isEmpty() || !partCols.isEmpty())
     {
@@ -295,14 +299,18 @@ public class CreateExternalTable extends Command
     sb.append(StringUtil.escapeSqlIdentifier(location) + " ");
 
     // file_format
-    sb.append("file_format=");
-    sb.append(HiveToSnowflakeType.toSnowflakeFileFormat(
-        sfFileFmtType,
-        hiveTable.getSd().getSerdeInfo(),
-        hiveTable.getParameters()));
+    sb.append("file_format= (type = parquet)");
+    // sb.append(HiveToSnowflakeType.toSnowflakeFileFormat(
+    //     sfFileFmtType,
+    //     hiveTable.getSd().getSerdeInfo(),
+    //     hiveTable.getParameters()));
 
     // All Hive-created tables have auto refresh disabled
     sb.append(" AUTO_REFRESH=false");
+
+    // Changes for delta table
+    sb.append(" refresh_on_create=false");
+    sb.append(" table_format=delta");
 
     // Add the connector version in the comments
     sb.append(" COMMENT='Generated with Hive metastore connector (version=");
@@ -462,7 +470,9 @@ public class CreateExternalTable extends Command
     stageLocationAndCommand.getQuery().ifPresent(queryList::add);
 
     Preconditions.checkNotNull(location);
-    queryList.add(generateCreateTableCommand(location));
+    String createTableCommand = generateCreateTableCommand(location);
+    log.error("Debug logging jayt createTableCommand: " + createTableCommand );
+    queryList.add(createTableCommand);
 
     if (this.hiveTable.getPartitionKeys().isEmpty())
     {
