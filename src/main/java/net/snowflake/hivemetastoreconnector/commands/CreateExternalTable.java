@@ -88,6 +88,9 @@ public class CreateExternalTable extends Command
         StringUtil.escapeSqlIdentifier(hiveTable.getTableName()));
   }
 
+  // '@jaytdelta_tables_dev_stage/backcast_base_energy_volumes/'
+  // se_energy_volumes-_PLACEHOLDER_
+
   /**
    * Helper method that generates a create stage command
    * @param canReplace Whether the stage should be replaced if one exists
@@ -340,6 +343,9 @@ public class CreateExternalTable extends Command
       throws SQLException
   {
     String hiveTableLocation = hiveTable.getSd().getLocation();
+    String matching_to_replace = "_contract_info.db|_cost_to_serve.db|_costs.db|default.db|_meter_info.db|_revenue.db|_stg_volumes.db|_tracking.db|_volumes.db|_weather.db";
+    String newHiveTableLocation = hiveTableLocation.replaceAll("-__PLACEHOLDER__", "/").replaceAll(matching_to_replace, "_tables");
+    log.error("original hiveTableLocation " + hiveTableLocation + " new newhiveTableLocation " + newHiveTableLocation);
     String integration = snowflakeConf.get(
         SnowflakeConf.ConfVars.SNOWFLAKE_INTEGRATION_FOR_HIVE_EXTERNAL_TABLES.getVarname(), null);
     String stage = snowflakeConf.get(
@@ -350,17 +356,21 @@ public class CreateExternalTable extends Command
     if (integration != null)
     {
       // An integration was provided. Use it to create a stage
+      log.error("An integration was provided. Use it to create a stage ");
       location = generateStageName(hiveTable, snowflakeConf);
       command = generateCreateStageCommand(
           this.canReplace,
           location,
-          HiveToSnowflakeType.toSnowflakeURL(hiveTableLocation),
+          HiveToSnowflakeType.toSnowflakeURL(newHiveTableLocation),
           String.format("STORAGE_INTEGRATION=%s",
                         StringUtil.escapeSqlIdentifier(integration)));
+      log.error("generateStageName returned location : " + location );                  
+      log.error("generateCreateStageCommand {} : " + command );
     }
     else if (stage != null)
     {
       // find the right snowflake schema for the stage
+      log.error("An stage name was provided. ");
       String schema =
           HiveToSnowflakeSchema.getSnowflakeSchemaFromHiveSchema(
               hiveTable.getDbName(),
@@ -383,6 +393,7 @@ public class CreateExternalTable extends Command
     else if (snowflakeConf.getBoolean(
         SnowflakeConf.ConfVars.SNOWFLAKE_ENABLE_CREDENTIALS_FROM_HIVE_CONF.getVarname(), false))
     {
+      log.error("No stage was specified, create one ");
       // No stage was specified, create one
       location = generateStageName(hiveTable, snowflakeConf);
       command = generateCreateStageCommand(
@@ -391,6 +402,7 @@ public class CreateExternalTable extends Command
           HiveToSnowflakeType.toSnowflakeURL(hiveTableLocation),
           StageCredentialUtil
               .generateCredentialsString(hiveTableLocation, hiveConf));
+      log.error("generateCreateStageCommand {} : " + command );
     }
     else
     {
