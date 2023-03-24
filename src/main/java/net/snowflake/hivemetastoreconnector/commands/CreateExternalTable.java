@@ -492,7 +492,46 @@ public class CreateExternalTable extends Command
       queryList.add(String.format("ALTER EXTERNAL TABLE %s REFRESH;",
                                   StringUtil.escapeSqlIdentifier(hiveTable.getTableName())));
     }
+    String warehose_query = "USE warehouse dev_dbt_operating_model ;" ;
+    queryList.add(warehose_query);
 
+    
+    String procedure =  new StringBuilder()
+    .append("CREATE OR REPLACE PROCEDURE generate_dynamic_table_from_connector(targettable VARCHAR, location VARCHAR)\n")
+    .append("RETURNS VARCHAR\n")
+    .append("LANGUAGE SQL\n")
+    .append("AS\n")
+    .append("DECLARE\n")
+    .append("   c1 CURSOR FOR select DISTINCT KEY from ")
+    .append(hiveTable.getTableName())
+    .append(", lateral flatten( VALUE );\n")
+    .append("   SQLstatement VARCHAR := 'CREATE or replace EXTERNAL TABLE ' || targettable  || '( ';\n")
+    .append("BEGIN\n")
+    .append("   FOR c IN c1 DO\n")
+    .append("      SQLstatement := SQLstatement || c.KEY  || ' VARCHAR(16777216) AS (CAST(GET(VALUE,  \\''|| c.key || '\\') AS VARCHAR(16777216))), '; \n")
+    .append("   END FOR;\n")
+    .append("   SQLstatement := LEFT( SQLstatement, LEN(SQLstatement) - 2 ) || ') ';\n")
+    .append("   SQLstatement := SQLstatement || ' \n")
+    .append("    location=' || location || '\n")
+    .append("  refresh_on_create =  false\n")
+    .append("  auto_refresh = false\n")
+    .append("  file_format = (type = parquet)\n")
+    .append("  table_format = delta; ';\n")
+    .append(" EXECUTE IMMEDIATE SQLstatement;\n")
+    .append(" RETURN SQLstatement;\n")
+    .append("END;\n")
+    .toString();
+    log.error("Stored Procedure: " + procedure );
+    
+    queryList.add(procedure);
+
+    String generate_dynamic_table_call_query =  String.format("call generate_dynamic_table_from_connector('%s', '@%s');",
+                                  StringUtil.escapeSqlIdentifier(hiveTable.getTableName()), location) ;
+  
+    queryList.add(generate_dynamic_table_call_query) ;
+    // Refreshing external table
+    queryList.add(String.format("ALTER EXTERNAL TABLE %s REFRESH;",
+                                StringUtil.escapeSqlIdentifier(hiveTable.getTableName())));
     return queryList;
   }
 
